@@ -1,8 +1,8 @@
 // @ts-check
 
-const fs = require("fs");
-const yaml = require("js-yaml");
-const core = require("@actions/core");
+import fs from "node:fs";
+import yaml from "js-yaml";
+import * as core from "@actions/core";
 
 /**
  * @param {NodeJS.ProcessEnv} env
@@ -10,7 +10,7 @@ const core = require("@actions/core");
  * @param {fs} fs
  * @param {core} core
  */
-async function run(env, body, fs, core) {
+export async function run(env, body, fs, core) {
   body = body ?? ""
   let form = {};
   try {
@@ -111,9 +111,35 @@ async function run(env, body, fs, core) {
     return result
   }
 
-  result = body
-    .trim()
-    .split("###")
+  function parseBody(body) {
+    let result = [];
+    let ignore = false;
+
+    body.split("\n").reduce((str, line, idx, arr) => {
+      // ``` Section must be ignored and not parsed as new section
+      if (line.startsWith("```"))
+        ignore = !ignore
+
+      // Parse new setion only if they start with ### SPACE
+      if (!ignore && line.startsWith("### ")) {
+        result.push(str.trim())
+
+        return line.replace(/^### /, "")+"\n";
+      }
+
+      str += line + "\n"
+
+      // Push the last string if we are at the end of lines
+      if (arr.length - 1 == idx)
+        result.push(str.trim())
+
+      return str;
+    }, "")
+
+    return result;
+  }
+
+  result = parseBody(body)
     .filter(Boolean)
     .map((line) => {
       return line
@@ -180,5 +206,3 @@ if (process.env.GITHUB_ACTIONS && process.env.NODE_ENV !== "test") {
 
   run(process.env, body, fs, core);
 }
-
-module.exports.run = run;
